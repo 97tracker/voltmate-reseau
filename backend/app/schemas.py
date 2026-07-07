@@ -27,6 +27,7 @@ class UserOut(BaseModel):
     display_name: str
     role: UserRole
     points: int
+    vehicle: str | None = None
     created_at: datetime
 
 
@@ -47,6 +48,10 @@ class BadgeOut(BaseModel):
 class UserProfileOut(UserOut):
     badges: list[BadgeOut] = []
     reports_count: int = 0
+
+
+class UserUpdate(BaseModel):
+    vehicle: str | None = Field(default=None, max_length=120)
 
 
 # ---------- Stations ----------

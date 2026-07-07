@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { getCurrentPosition } from "@/lib/geolocation";
 import type { AssistantAnswer } from "@/lib/types";
@@ -19,25 +20,38 @@ const SUGGESTIONS = [
   "Trouve-moi une borne fiable proche.",
 ];
 
-export default function AssistantPage() {
+function AssistantContent() {
+  const searchParams = useSearchParams();
+  const stationId = searchParams.get("station");
+  const stationName = searchParams.get("name");
+  const autoAsked = useRef(false);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      text: "Bonjour ! Je suis l'assistant VoltMate. Demandez-moi si une borne est fiable, combien de batterie prévoir pour un trajet, ou tout autre conseil de recharge.",
+      text: stationName
+        ? `Bonjour ! Vous consultez ${stationName}. Posez-moi une question sur cette borne, ou demandez-moi autre chose.`
+        : "Bonjour ! Je suis l'assistant VoltMate. Demandez-moi si une borne est fiable, combien de batterie prévoir pour un trajet, ou tout autre conseil de recharge.",
     },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function send(question: string) {
+  async function send(question: string, forStationId?: string) {
     if (!question.trim()) return;
     setMessages((prev) => [...prev, { role: "user", text: question }]);
     setInput("");
     setLoading(true);
 
-    const payload: { question: string; latitude?: number; longitude?: number; trip_distance_km?: number } = {
-      question,
-    };
+    const payload: {
+      question: string;
+      station_id?: string;
+      latitude?: number;
+      longitude?: number;
+      trip_distance_km?: number;
+    } = { question };
+
+    if (forStationId) payload.station_id = forStationId;
 
     const distanceMatch = question.match(/(\d+)\s*km/i);
     if (distanceMatch) {
@@ -86,6 +100,14 @@ export default function AssistantPage() {
     }
   }
 
+  useEffect(() => {
+    if (stationId && !autoAsked.current) {
+      autoAsked.current = true;
+      send(stationName ? `Cette borne (${stationName}) est-elle fiable ?` : "Cette borne est-elle fiable ?", stationId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stationId]);
+
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-bold text-ink-900">Assistant VoltMate</h1>
@@ -115,7 +137,11 @@ export default function AssistantPage() {
 
       <div className="flex flex-wrap gap-2">
         {SUGGESTIONS.map((s) => (
-          <button key={s} onClick={() => send(s)} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-ink-700">
+          <button
+            key={s}
+            onClick={() => send(s, stationId || undefined)}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-ink-700"
+          >
             {s}
           </button>
         ))}
@@ -124,7 +150,7 @@ export default function AssistantPage() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          send(input);
+          send(input, stationId || undefined);
         }}
         className="sticky bottom-16 flex gap-2 rounded-2xl bg-white p-2 shadow-md border border-slate-100"
       >
@@ -139,5 +165,13 @@ export default function AssistantPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function AssistantPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-ink-500">Chargement...</p>}>
+      <AssistantContent />
+    </Suspense>
   );
 }

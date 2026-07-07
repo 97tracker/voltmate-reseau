@@ -1,11 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { Award, Settings } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Award, Car, Settings } from "lucide-react";
+import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import type { UserProfile } from "@/lib/types";
 
 export default function ProfilePage() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, refresh } = useAuth();
+  const [vehicle, setVehicle] = useState("");
+  const [savingVehicle, setSavingVehicle] = useState(false);
+  const [vehicleMsg, setVehicleMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    setVehicle(user?.vehicle || "");
+  }, [user]);
+
+  async function saveVehicle(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingVehicle(true);
+    setVehicleMsg(null);
+    try {
+      await api.patch<UserProfile>("/users/me", { vehicle: vehicle.trim() || null });
+      await refresh();
+      setVehicleMsg("Véhicule enregistré.");
+    } catch (err) {
+      setVehicleMsg(err instanceof ApiError ? err.message : "Impossible d'enregistrer le véhicule.");
+    } finally {
+      setSavingVehicle(false);
+    }
+  }
 
   if (loading) return <p className="text-sm text-ink-500">Chargement...</p>;
 
@@ -63,6 +88,28 @@ export default function ProfilePage() {
             ))}
           </div>
         )}
+      </div>
+
+      <div className="card">
+        <h2 className="mb-1 flex items-center gap-2 font-semibold text-ink-900">
+          <Car className="h-5 w-5 text-volt-600" />
+          Mon véhicule
+        </h2>
+        <p className="mb-3 text-xs text-ink-500">
+          Utilisé par l&apos;assistant pour des conseils adaptés (autonomie, temps de charge).
+        </p>
+        <form onSubmit={saveVehicle} className="flex flex-col gap-2">
+          <input
+            className="input"
+            placeholder="Ex : Renault Mégane E-Tech"
+            value={vehicle}
+            onChange={(e) => setVehicle(e.target.value)}
+          />
+          <button type="submit" className="btn-secondary self-start" disabled={savingVehicle}>
+            {savingVehicle ? "Enregistrement..." : "Enregistrer"}
+          </button>
+          {vehicleMsg && <p className="text-sm text-ink-500">{vehicleMsg}</p>}
+        </form>
       </div>
 
       {user.role === "admin" && (

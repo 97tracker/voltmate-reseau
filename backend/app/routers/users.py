@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Report, User
-from app.schemas import TokenOut, UserCreate, UserLogin, UserProfileOut
+from app.schemas import TokenOut, UserCreate, UserLogin, UserProfileOut, UserUpdate
 from app.security import create_access_token, get_current_user, hash_password, verify_password
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -40,6 +40,23 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=UserProfileOut)
 def get_me(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    reports_count = db.query(Report).filter(Report.user_id == user.id).count()
+    profile = UserProfileOut.model_validate(user)
+    profile.reports_count = reports_count
+    return profile
+
+
+@router.patch("/me", response_model=UserProfileOut)
+def update_me(
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    user.vehicle = payload.vehicle
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
     reports_count = db.query(Report).filter(Report.user_id == user.id).count()
     profile = UserProfileOut.model_validate(user)
     profile.reports_count = reports_count
