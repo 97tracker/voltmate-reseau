@@ -50,6 +50,31 @@ function Recenter({ center }: { center: [number, number] }) {
   return null;
 }
 
+// Leaflet measures its container's size once, at creation time. In a Next.js page the
+// MapContainer is mounted (via next/dynamic, ssr:false) before the surrounding flex/Tailwind
+// layout has necessarily settled into its final size — the map then renders tiles for a
+// stale, usually smaller, box, leaving grey/blank corners once the real container grows to
+// fill h-[60vh]. invalidateSize() forces Leaflet to re-measure; a ResizeObserver keeps it
+// correct across viewport rotation, sidebar toggles, etc., not just the first paint.
+function InvalidateOnResize() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+    const raf = requestAnimationFrame(() => map.invalidateSize());
+    const timeout = setTimeout(() => map.invalidateSize(), 250);
+
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(container);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timeout);
+      observer.disconnect();
+    };
+  }, [map]);
+  return null;
+}
+
 interface MapViewProps {
   stations: Station[];
   center: [number, number];
@@ -67,6 +92,7 @@ export default function MapView({ stations, center, userPosition }: MapViewProps
       />
       <ZoomControl position="bottomright" />
       <Recenter center={center} />
+      <InvalidateOnResize />
       {userPosition && (
         <Marker position={userPosition} icon={youAreHereIcon} zIndexOffset={-100}>
           <Popup>Vous êtes ici (approximatif)</Popup>
