@@ -1,8 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
-import { LocateFixed } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { LocateFixed, Search, X } from "lucide-react";
 import StationCard from "@/components/StationCard";
 import { api } from "@/lib/api";
 import { getCurrentPosition } from "@/lib/geolocation";
@@ -19,14 +19,27 @@ interface IpLocateResponse {
   city: string | null;
 }
 
+interface AddressResult {
+  label: string;
+  latitude: number;
+  longitude: number;
+}
+
 export default function MapPage() {
   const [stations, setStations] = useState<Station[]>([]);
   const [center, setCenter] = useState<[number, number]>(PARIS_CENTER);
   const [userPosition, setUserPosition] = useState<[number, number] | null>(null);
+  const [searchMarker, setSearchMarker] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(true);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<AddressResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [resultsOpen, setResultsOpen] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function loadAll() {
     setLoading(true);
@@ -53,7 +66,7 @@ export default function MapPage() {
         // fall back to showing every station rather than an empty map, which
         // otherwise reads as "the map is broken".
         setNotice(
-          `Aucune borne trouvée à moins de ${NEARBY_RADIUS_KM} km de votre position. Voici toutes les bornes disponibles.`
+          `Aucune borne trouvée à moins de ${NEARBY_RADIUS_KM} km de cette position. Voici toutes les bornes disponibles.`
         );
         const all = await api.get<Station[]>("/stations");
         setStations(all);
@@ -92,6 +105,7 @@ export default function MapPage() {
     setLocating(true);
     setError(null);
     setNotice(null);
+    setSearchMarker(null);
     try {
       const { latitude, longitude } = await getCurrentPosition();
       setUserPosition([latitude, longitude]);
@@ -103,17 +117,91 @@ export default function MapPage() {
     }
   }
 
+  function onQueryChange(value: string) {
+    setQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (value.trim().length < 3) {
+      setResults([]);
+      setResultsOpen(false);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const data = await api.get<AddressResult[]>(`/geo/search?q=${encodeURIComponent(value)}`);
+        setResults(data);
+        setResultsOpen(true);
+      } catch {
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 450);
+  }
+
+  async function pickResult(result: AddressResult) {
+    setQuery(result.label);
+    setResultsOpen(false);
+    setError(null);
+    setNotice(null);
+    setSearchMarker([result.latitude, result.longitude]);
+    await loadNearby(result.latitude, result.longitude);
+  }
+
+  function clearSearch() {
+    setQuery("");
+    setResults([]);
+    setResultsOpen(false);
+    setSearchMarker(null);
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-ink-900">Bornes proches</h1>
       </div>
 
+      <div className="relative z-[600]">
+        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-volt-500">
+          <Search className="h-4 w-4 shrink-0 text-ink-500" />
+          <input
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            onFocus={() => results.length > 0 && setResultsOpen(true)}
+            placeholder="Chercher une adresse, une ville, un secteur..."
+            className="w-full border-none bg-transparent text-sm outline-none focus:ring-0"
+          />
+          {searching && <span className="text-xs text-ink-500">...</span>}
+          {query && (
+            <button onClick={clearSearch} aria-label="Effacer la recherche" className="text-ink-400 hover:text-ink-700">
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {resultsOpen && results.length > 0 && (
+          <ul className="absolute mt-1 w-full overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-lg">
+            {results.map((r, i) => (
+              <li key={i}>
+                <button
+                  onClick={() => pickResult(r)}
+                  className="w-full px-4 py-2.5 text-left text-sm text-ink-700 hover:bg-volt-50"
+                >
+                  {r.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       {notice && <p className="text-sm text-ink-500">{notice}</p>}
 
       <div className="relative h-[60vh] min-h-[420px] overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
-        <MapView stations={stations} center={center} userPosition={userPosition} />
+        <MapView stations={stations} center={center} userPosition={userPosition} searchMarker={searchMarker} />
         <button
           onClick={useMyPosition}
           disabled={locating}
