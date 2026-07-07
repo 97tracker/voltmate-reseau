@@ -1,17 +1,31 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
-import { LocateFixed, Search, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, LocateFixed, Search, X } from "lucide-react";
 import StationCard from "@/components/StationCard";
 import { api } from "@/lib/api";
 import { getCurrentPosition } from "@/lib/geolocation";
-import type { Station } from "@/lib/types";
+import { STATION_STATUS_LABELS, Station, StationStatus } from "@/lib/types";
 
 const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
 
 const PARIS_CENTER: [number, number] = [48.8566, 2.3522];
 const NEARBY_RADIUS_KM = 30;
+const PAGE_SIZE = 15;
+
+const ZONES: Record<string, string> = {
+  "77": "Seine-et-Marne (77)",
+  "91": "Essonne (91)",
+  "94": "Val-de-Marne (94)",
+};
+
+function zoneOf(station: Station): string | null {
+  const match = station.address.match(/\b(\d{5})\b/);
+  if (!match) return null;
+  const dept = match[1].slice(0, 2);
+  return dept in ZONES ? dept : null;
+}
 
 interface IpLocateResponse {
   latitude: number | null;
@@ -40,6 +54,26 @@ export default function MapPage() {
   const [searching, setSearching] = useState(false);
   const [resultsOpen, setResultsOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [statusFilter, setStatusFilter] = useState<StationStatus | "all">("all");
+  const [zoneFilter, setZoneFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+
+  const filteredStations = useMemo(() => {
+    return stations.filter((s) => {
+      if (statusFilter !== "all" && s.current_status !== statusFilter) return false;
+      if (zoneFilter !== "all" && zoneOf(s) !== zoneFilter) return false;
+      return true;
+    });
+  }, [stations, statusFilter, zoneFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredStations.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedStations = filteredStations.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, zoneFilter, stations]);
 
   async function loadAll() {
     setLoading(true);
@@ -201,7 +235,7 @@ export default function MapPage() {
       {notice && <p className="text-sm text-ink-500">{notice}</p>}
 
       <div className="relative h-[60vh] min-h-[420px] overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
-        <MapView stations={stations} center={center} userPosition={userPosition} searchMarker={searchMarker} />
+        <MapView stations={filteredStations} center={center} userPosition={userPosition} searchMarker={searchMarker} />
         <button
           onClick={useMyPosition}
           disabled={locating}
@@ -212,15 +246,70 @@ export default function MapPage() {
         </button>
       </div>
 
+      <div className="flex gap-2">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as StationStatus | "all")}
+          className="input flex-1 text-sm"
+        >
+          <option value="all">Tous les statuts</option>
+          {Object.entries(STATION_STATUS_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={zoneFilter}
+          onChange={(e) => setZoneFilter(e.target.value)}
+          className="input flex-1 text-sm"
+        >
+          <option value="all">Tous les secteurs</option>
+          {Object.entries(ZONES).map(([code, label]) => (
+            <option key={code} value={code}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="flex flex-col gap-3">
         {loading && <p className="text-sm text-ink-500">Chargement des bornes...</p>}
-        {!loading && stations.length === 0 && (
-          <p className="text-sm text-ink-500">Aucune borne trouvée. Soyez le premier à en ajouter une !</p>
+        {!loading && filteredStations.length === 0 && (
+          <p className="text-sm text-ink-500">
+            {stations.length === 0
+              ? "Aucune borne trouvée. Soyez le premier à en ajouter une !"
+              : "Aucune borne ne correspond à ces filtres."}
+          </p>
         )}
-        {stations.map((station) => (
+        {paginatedStations.map((station) => (
           <StationCard key={station.id} station={station} />
         ))}
       </div>
+
+      {pageCount > 1 && (
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="btn-secondary text-sm disabled:opacity-40"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Précédent
+          </button>
+          <span className="text-sm text-ink-500">
+            Page {currentPage} / {pageCount} ({filteredStations.length} bornes)
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+            disabled={currentPage === pageCount}
+            className="btn-secondary text-sm disabled:opacity-40"
+          >
+            Suivant
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
