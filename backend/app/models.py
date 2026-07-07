@@ -84,6 +84,8 @@ class Station(Base):
     estimated_price = Column(String(80), nullable=True)
     current_status = Column(Enum(StationStatus), nullable=False, default=StationStatus.unknown)
     reliability_score = Column(Integer, nullable=False, default=50)
+    source = Column(String(20), nullable=False, default="community")
+    external_ref = Column(String(120), nullable=True, unique=True, index=True)
     created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
