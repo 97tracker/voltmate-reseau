@@ -33,10 +33,11 @@ conducteurs qui signalent) : la stratégie de lancement doit résoudre ça avant
 nationale.
 
 **Décision** : lancement **hyper-local** sur un bassin géographique restreint plutôt que national.
-Les données de seed (Melun, Fontainebleau, Lieusaint, Évry, Créteil) couvrent déjà la Seine-et-Marne
-/ Essonne / Val-de-Marne : c'est le bassin de lancement naturel. Objectif de la Phase 1 : atteindre
-une **densité de signalements critique sur ce bassin** (voir KPI plus bas) avant d'ouvrir d'autres
-villes, ville par ville, plutôt que de diluer l'effort sur toute la France dès le jour 1.
+La carte couvre désormais la Seine-et-Marne / Essonne / Val-de-Marne avec les 1 956 bornes réelles du
+jeu de données IRVE (data.gouv.fr), qui ont remplacé les anciennes données de seed de démo (Melun,
+Fontainebleau, Lieusaint, Évry, Créteil) — voir Phase 1. Objectif de la Phase 1 : atteindre une
+**densité de signalements critique sur ce bassin** (voir KPI plus bas) avant d'ouvrir d'autres villes,
+ville par ville, plutôt que de diluer l'effort sur toute la France dès le jour 1.
 
 ## 3. Modèle de revenus (phasé, pas dès le jour 1)
 
@@ -59,9 +60,17 @@ villes, ville par ville, plutôt que de diluer l'effort sur toute la France dès
 ### Phase 1 — Densité locale & confiance (0-6 mois) 🟡
 Objectif business : prouver que la boucle signalement → confiance → nouvelle visite fonctionne sur
 un bassin restreint, avant de dépenser un euro en acquisition nationale.
-- 🟡 Import initial OpenChargeMap sur le bassin de lancement (Seine-et-Marne/Essonne/Val-de-Marne)
-  pour éviter des cartes vides — **attention licence ODbL : attribution obligatoire, à valider avant
-  import réel**
+- ✅ Import initial de bornes réelles sur le bassin de lancement (Seine-et-Marne/Essonne/Val-de-Marne)
+  pour éviter des cartes vides — **fait via le Fichier consolidé IRVE de data.gouv.fr/ODRE (licence
+  Ouverte 2.0), pas OpenChargeMap** (voir §6 Risques pour le changement de source). 1 956 bornes
+  réelles importées (adresse, opérateur, type de connecteur, puissance), remplaçant les 12 bornes de
+  démo. Script `backend/import_irve.py`, idempotent (upsert par `external_ref`, donc ré-exécutable
+  pour rafraîchir ou étendre à d'autres départements). Mergé via PR #8 (commit `5705b87`).
+  **Important — ceci ne couvre que la densité de localisation, pas le signal de confiance** : les
+  1 956 bornes démarrent toutes avec `current_status = "unknown"` et `reliability_score = 50`
+  (neutre) ; la confiance communautaire ne se construit que par de vrais signalements, qui restent à
+  zéro. Les KPI de sortie de Phase 1 ci-dessous ne sont **pas** considérés atteints par ce seul
+  import.
 - ⬜ Campagne de stickers QR physiques sur le bassin de lancement (impression + pose manuelle par
   l'équipe et les premiers utilisateurs)
 - ⬜ Seeding communautaire : forums EV français (Automobile-Propre, groupes Facebook véhicule
@@ -114,12 +123,17 @@ un bassin restreint, avant de dépenser un euro en acquisition nationale.
   « en panne » sur une borne saine. Nécessite modération (déjà présent : suppression de
   commentaires/photos, fusion de bornes) + limitation de débit (déjà en place, `REPORT_RATE_LIMIT`)
   — à surveiller et durcir si abus détecté.
-- **Licence des données importées** : OpenChargeMap est sous licence ODbL — attribution et partage à
-  l'identique à respecter avant tout import en Phase 1.
+- **Licence des données importées** : risque identifié initialement pour OpenChargeMap (licence
+  ODbL, attribution + partage à l'identique obligatoires). En pratique, l'import Phase 1 a finalement
+  utilisé le Fichier consolidé IRVE de data.gouv.fr/ODRE — licence Ouverte 2.0 (Etalab), sans
+  obligation de partage à l'identique, alimenté quotidiennement par les opérateurs eux-mêmes sous
+  obligation légale. OpenChargeMap n'a pas été utilisé ; ce risque est levé pour la source de données
+  actuellement en place. Réévaluer si une autre source tierce est ajoutée plus tard.
 - **Coût de modération** à l'échelle : la Phase 1 reste gérable manuellement sur un bassin restreint ;
   prévoir un outillage de modération plus riche avant la Phase 2.
-- **Dépendance à un tiers gratuit** (OpenStreetMap/Nominatim, OpenChargeMap) : prévoir un plan B si
-  les quotas/conditions changent.
+- **Dépendance à un tiers gratuit** (OpenStreetMap/Nominatim, data.gouv.fr/ODRE pour l'import IRVE) :
+  prévoir un plan B si les quotas/conditions changent. L'import IRVE étant idempotent et
+  ré-exécutable, un refresh périodique ou une extension à d'autres départements reste peu coûteux.
 
 ---
 

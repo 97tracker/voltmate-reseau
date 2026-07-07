@@ -196,8 +196,9 @@ hyper-local, modèle de revenus phasé, KPI, risques) sont dans **[ROADMAP.md](R
 
 - **Phase 0 — MVP technique** (ce dépôt) : carte, fiches bornes, signalements, score de fiabilité,
   QR codes, assistant à règles, gamification, dashboard admin.
-- **Phase 1 — Densité locale & confiance** : lancement hyper-local (pas national), import
-  OpenChargeMap ciblé, campagne de stickers QR, seeding communautaire.
+- **Phase 1 — Densité locale & confiance** : lancement hyper-local (pas national), import initial des
+  bornes réelles du bassin de lancement (IRVE/data.gouv.fr, ✅ fait — 1 956 bornes), campagne de
+  stickers QR, seeding communautaire.
 - **Phase 2 — Croissance géographique + Premium** : réplication ville par ville, lancement du
   compte Premium une fois la rétention validée.
 - **Phase 3 — Monétisation B2B** : certification « VoltMate Vérifié », data anonymisée pour flottes.
