@@ -70,6 +70,7 @@ export interface User {
   display_name: string;
   role: UserRole;
   points: number;
+  vehicle: string | null;
   created_at: string;
 }
 

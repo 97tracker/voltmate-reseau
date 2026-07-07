@@ -43,6 +43,33 @@ body {
   height: 100%;
 }
 
+.charge-tutorial-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(34, 197, 94, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 197, 94, 0.16) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 55%, black 30%, transparent 90%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 55%, black 30%, transparent 90%);
+}
+
+.charge-tutorial-cable {
+  animation: charge-tutorial-flow 1.4s linear infinite;
+}
+
+@keyframes charge-tutorial-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .charge-tutorial-cable {
+    animation: none;
+  }
+}
+
 /* ---------- Futuristic hero (landing page) ---------- */
 
 .hero-shell {

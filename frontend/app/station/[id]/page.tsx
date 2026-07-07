@@ -3,7 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Bot, CheckCircle2 } from "lucide-react";
+import ChargingTutorial from "@/components/ChargingTutorial";
 import StatusBadge from "@/components/StatusBadge";
 import { api } from "@/lib/api";
 import { REPORT_STATUS_LABELS, StationDetail } from "@/lib/types";
@@ -95,9 +96,18 @@ export default function StationDetailPage({ params }: { params: { id: string } }
             <CheckCircle2 className="h-5 w-5" />
             J&apos;ai chargé ici
           </button>
+          <Link
+            href={`/assistant?station=${station.id}&name=${encodeURIComponent(station.name)}`}
+            className="btn-secondary w-full"
+          >
+            <Bot className="h-5 w-5" />
+            Parler à l&apos;assistant de cette borne
+          </Link>
           {chargeMsg && <p className="text-center text-sm text-ink-500">{chargeMsg}</p>}
         </div>
       </div>
+
+      <ChargingTutorial station={station} />
 
       <div className="card">
         <h2 className="mb-2 font-semibold text-ink-900">Derniers signalements</h2>

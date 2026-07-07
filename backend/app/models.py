@@ -62,6 +62,7 @@ class User(Base):
     display_name = Column(String(100), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.user)
     points = Column(Integer, nullable=False, default=0)
+    vehicle = Column(String(120), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     reports = relationship("Report", back_populates="user")

@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
     display_name VARCHAR(100) NOT NULL,
     role user_role NOT NULL DEFAULT 'user',
     points INTEGER NOT NULL DEFAULT 0,
+    vehicle VARCHAR(120),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
