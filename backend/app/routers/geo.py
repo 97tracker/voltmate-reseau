@@ -1,6 +1,8 @@
 import httpx
 from fastapi import APIRouter, Query, Request
 
+from app.limiter import limiter
+
 router = APIRouter(prefix="/geo", tags=["geo"])
 
 _PRIVATE_PREFIXES = ("10.", "172.", "192.168.", "127.")
@@ -13,6 +15,7 @@ _NOMINATIM_HEADERS = {"User-Agent": "VoltMate/1.0 (contact@voltmate-reseau.com)"
 
 
 @router.get("/locate")
+@limiter.limit("30/minute")
 def locate_by_ip(request: Request):
     """Approximate the caller's position from their public IP.
 
@@ -42,7 +45,8 @@ def locate_by_ip(request: Request):
 
 
 @router.get("/search")
-def search_address(q: str = Query(..., min_length=2, max_length=200)):
+@limiter.limit("20/minute")
+def search_address(request: Request, q: str = Query(..., min_length=2, max_length=200)):
     """Geocode a free-text address/place name (France-biased) via Nominatim (OSM).
 
     Returns a short list of candidates so the frontend can let the user disambiguate
