@@ -1,0 +1,131 @@
+# VoltMate — isolated Docker Compose stack.
+# Everything runs on a dedicated `voltmate-network`. Postgres & Redis are NOT
+# published on the host (no collision with other apps already using 5432/6379
+# on this box). Only voltmate-nginx is exposed, on a port chosen in .env.
+
+name: voltmate
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  voltmate-db:
+    image: postgres:16-alpine
+    container_name: voltmate-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-voltmate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-voltmate}
+      POSTGRES_DB: ${POSTGRES_DB:-voltmate}
+    volumes:
+      - voltmate-pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    networks: [voltmate-network]
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-voltmate} -d ${POSTGRES_DB:-voltmate}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  voltmate-redis:
+    image: redis:7-alpine
+    container_name: voltmate-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - voltmate-redisdata:/data
+    networks: [voltmate-network]
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  voltmate-backend:
+    build:
+      context: ./backend
+    image: voltmate-backend:latest
+    container_name: voltmate-backend
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      POSTGRES_HOST: voltmate-db
+      REDIS_URL: redis://voltmate-redis:6379/0
+    volumes:
+      - voltmate-uploads:/app/uploads
+    depends_on:
+      voltmate-db:
+        condition: service_healthy
+      voltmate-redis:
+        condition: service_healthy
+    networks: [voltmate-network]
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  voltmate-frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+    image: voltmate-frontend:latest
+    container_name: voltmate-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+    depends_on:
+      voltmate-backend:
+        condition: service_healthy
+    networks: [voltmate-network]
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  voltmate-nginx:
+    image: nginx:alpine
+    container_name: voltmate-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx/voltmate-internal.conf:/etc/nginx/conf.d/default.conf:ro
+      - voltmate-uploads:/uploads:ro
+    depends_on:
+      voltmate-backend:
+        condition: service_healthy
+      voltmate-frontend:
+        condition: service_healthy
+    ports:
+      - "${VOLTMATE_HTTP_PORT:-8101}:80"
+    networks: [voltmate-network]
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  voltmate-network:
+    name: voltmate-network
+    driver: bridge
+
+volumes:
+  voltmate-pgdata:
+    name: voltmate-pgdata
+  voltmate-redisdata:
+    name: voltmate-redisdata
+  voltmate-uploads:
+    name: voltmate-uploads
