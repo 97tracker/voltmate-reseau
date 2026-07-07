@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, LocateFixed, Search, X } from "lucide-react";
 import StationCard from "@/components/StationCard";
 import { api } from "@/lib/api";
+import { departmentCodeFromAddress, FRENCH_DEPARTMENTS } from "@/lib/departments";
 import { getCurrentPosition } from "@/lib/geolocation";
 import { STATION_STATUS_LABELS, Station, StationStatus } from "@/lib/types";
 
@@ -13,19 +14,6 @@ const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
 const PARIS_CENTER: [number, number] = [48.8566, 2.3522];
 const NEARBY_RADIUS_KM = 30;
 const PAGE_SIZE = 15;
-
-const ZONES: Record<string, string> = {
-  "77": "Seine-et-Marne (77)",
-  "91": "Essonne (91)",
-  "94": "Val-de-Marne (94)",
-};
-
-function zoneOf(station: Station): string | null {
-  const match = station.address.match(/\b(\d{5})\b/);
-  if (!match) return null;
-  const dept = match[1].slice(0, 2);
-  return dept in ZONES ? dept : null;
-}
 
 interface IpLocateResponse {
   latitude: number | null;
@@ -59,10 +47,22 @@ export default function MapPage() {
   const [zoneFilter, setZoneFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
 
+  // Only offer zones that actually have a station in the currently loaded set — a
+  // dropdown listing all ~100 French departments when the data only covers 3 would be
+  // mostly dead ends. This scales automatically as VoltMate's real coverage grows.
+  const availableZones = useMemo(() => {
+    const codes = new Set<string>();
+    for (const s of stations) {
+      const code = departmentCodeFromAddress(s.address);
+      if (code) codes.add(code);
+    }
+    return Array.from(codes).sort();
+  }, [stations]);
+
   const filteredStations = useMemo(() => {
     return stations.filter((s) => {
       if (statusFilter !== "all" && s.current_status !== statusFilter) return false;
-      if (zoneFilter !== "all" && zoneOf(s) !== zoneFilter) return false;
+      if (zoneFilter !== "all" && departmentCodeFromAddress(s.address) !== zoneFilter) return false;
       return true;
     });
   }, [stations, statusFilter, zoneFilter]);
@@ -265,9 +265,9 @@ export default function MapPage() {
           className="input flex-1 text-sm"
         >
           <option value="all">Tous les secteurs</option>
-          {Object.entries(ZONES).map(([code, label]) => (
+          {availableZones.map((code) => (
             <option key={code} value={code}>
-              {label}
+              {FRENCH_DEPARTMENTS[code] || code} ({code})
             </option>
           ))}
         </select>
