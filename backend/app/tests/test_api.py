@@ -100,14 +100,42 @@ def test_assistant_trip_distance_estimate(client):
     assert "50%" in resp.json()["answer"]
 
 
-def test_qrcode_returns_png(client):
+def test_qrcode_requires_admin(client):
     resp = client.post(
         "/api/stations",
         json={"name": "QR Station", "address": "Somewhere", "latitude": 1.0, "longitude": 1.0},
     )
     station_id = resp.json()["id"]
 
+    # QR generation is an internal/admin-only tool (users add stations, report issues,
+    # and scan QR codes VoltMate itself places — they never generate or print one).
     resp = client.get(f"/api/stations/{station_id}/qrcode")
+    assert resp.status_code == 401
+
+
+def test_qrcode_returns_png_for_admin(client, db_session):
+    from app.models import User, UserRole
+    from app.security import hash_password
+
+    resp = client.post(
+        "/api/stations",
+        json={"name": "QR Station", "address": "Somewhere", "latitude": 1.0, "longitude": 1.0},
+    )
+    station_id = resp.json()["id"]
+
+    admin = User(
+        email="qr-admin@example.com",
+        password_hash=hash_password("s3cret123"),
+        display_name="QR Admin",
+        role=UserRole.admin,
+    )
+    db_session.add(admin)
+    db_session.commit()
+
+    login = client.post("/api/users/login", json={"email": "qr-admin@example.com", "password": "s3cret123"})
+    token = login.json()["access_token"]
+
+    resp = client.get(f"/api/stations/{station_id}/qrcode", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "image/png"
 

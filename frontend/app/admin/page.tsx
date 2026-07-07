@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, fetchQrCodeUrl } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { REPORT_STATUS_LABELS, STATION_STATUS_LABELS, AdminStats, StationStatus } from "@/lib/types";
 
@@ -13,6 +13,10 @@ export default function AdminPage() {
   const [mergeKeep, setMergeKeep] = useState("");
   const [mergeRemove, setMergeRemove] = useState("");
   const [mergeMsg, setMergeMsg] = useState<string | null>(null);
+  const [qrStationId, setQrStationId] = useState("");
+  const [qrImage, setQrImage] = useState<string | null>(null);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
 
   async function load() {
     try {
@@ -41,6 +45,22 @@ export default function AdminPage() {
       load();
     } catch (err) {
       setMergeMsg(err instanceof ApiError ? err.message : "Erreur lors de la fusion.");
+    }
+  }
+
+  async function generateQrCode(e: React.FormEvent) {
+    e.preventDefault();
+    setQrError(null);
+    setQrLoading(true);
+    if (qrImage) URL.revokeObjectURL(qrImage);
+    setQrImage(null);
+    try {
+      const url = await fetchQrCodeUrl(qrStationId);
+      setQrImage(url);
+    } catch (err) {
+      setQrError(err instanceof ApiError ? err.message : "Impossible de générer le QR code.");
+    } finally {
+      setQrLoading(false);
     }
   }
 
@@ -141,6 +161,35 @@ export default function AdminPage() {
           </button>
           {mergeMsg && <p className="text-sm text-ink-500">{mergeMsg}</p>}
         </form>
+      </div>
+
+      <div className="card">
+        <h2 className="mb-2 font-semibold text-ink-900">Générer un QR code (usage interne)</h2>
+        <p className="mb-3 text-xs text-ink-500">
+          Réservé à l&apos;équipe VoltMate : à imprimer et coller vous-même, ou à transmettre aux
+          exploitants de bornes. Les utilisateurs n&apos;ont pas accès à cette fonction.
+        </p>
+        <form onSubmit={generateQrCode} className="flex flex-col gap-2">
+          <input
+            className="input"
+            placeholder="ID de la borne"
+            value={qrStationId}
+            onChange={(e) => setQrStationId(e.target.value)}
+            required
+          />
+          <button type="submit" className="btn-primary self-start" disabled={qrLoading}>
+            {qrLoading ? "Génération..." : "Générer"}
+          </button>
+          {qrError && <p className="text-sm text-red-600">{qrError}</p>}
+        </form>
+        {qrImage && (
+          <div className="mt-3 flex flex-col items-center gap-2">
+            <img src={qrImage} alt="QR code de la borne" className="h-40 w-40" />
+            <a href={qrImage} download={`voltmate-${qrStationId}.png`} className="btn-secondary text-sm">
+              Télécharger
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

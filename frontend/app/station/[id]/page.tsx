@@ -3,9 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, QrCode } from "lucide-react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
-import { api, qrcodeUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import { REPORT_STATUS_LABELS, StationDetail } from "@/lib/types";
 
 export default function StationDetailPage({ params }: { params: { id: string } }) {
@@ -97,18 +97,6 @@ export default function StationDetailPage({ params }: { params: { id: string } }
           </button>
           {chargeMsg && <p className="text-center text-sm text-ink-500">{chargeMsg}</p>}
         </div>
-      </div>
-
-      <div className="card flex flex-col items-center gap-2">
-        <h2 className="flex items-center gap-2 font-semibold text-ink-900">
-          <QrCode className="h-5 w-5 text-volt-600" />
-          QR code de la borne
-        </h2>
-        <img src={qrcodeUrl(station.id)} alt="QR code de la borne" className="h-40 w-40" />
-        <p className="text-center text-xs text-ink-500">
-          Imprimez ce QR code et collez-le près de la borne pour que d&apos;autres conducteurs puissent la
-          noter.
-        </p>
       </div>
 
       <div className="card">

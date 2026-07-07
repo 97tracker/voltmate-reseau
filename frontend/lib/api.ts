@@ -56,6 +56,17 @@ export const api = {
   del: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
-export function qrcodeUrl(stationId: string): string {
-  return `${API_BASE}/stations/${stationId}/qrcode`;
+// QR generation is an admin-only endpoint (see backend/app/routers/qrcode.py) — a plain
+// <img src> can't carry the Authorization header, so this does an authenticated fetch and
+// hands back an object URL the caller is responsible for revoking when done with it.
+export async function fetchQrCodeUrl(stationId: string): Promise<string> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/stations/${stationId}/qrcode`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    throw new ApiError(res.status, "Impossible de générer le QR code.");
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
