@@ -7,11 +7,13 @@ The source dataset is one row per physical charge point (PDC), several of which
 usually share one station (`id_station_itinerance`) — this script groups PDC
 rows into one VoltMate Station per real-world station before inserting.
 
-Idempotent: matches on `external_ref` (the source's station id) and only
-updates descriptive fields on re-run (name/address/operator/connector/power/
-price) — it never touches `current_status` or `reliability_score`, which are
-owned by VoltMate's own community reports (see app/reliability.py), not by
-this import.
+Idempotent: matches on `external_ref` (the source's station id). A brand-new station is
+seeded with `current_status="ok"` (presumed operational, since it's in the official
+registry) so the map isn't full of grey "unknown" pins with nothing for users to react
+to — but on re-run, an *existing* station's `current_status`/`reliability_score` is never
+touched, since by then it may reflect real community reports (see app/reliability.py),
+which this import must not overwrite. Only descriptive fields (name/address/operator/
+connector/power/price) refresh on re-run.
 
 Usage (from the backend container or a local venv with the same deps):
     python import_irve.py
@@ -21,7 +23,7 @@ from collections import defaultdict
 import httpx
 
 from app.database import Base, SessionLocal, engine
-from app.models import ConnectorType, Station
+from app.models import ConnectorType, Station, StationStatus
 
 API_URL = "https://odre.opendatasoft.com/api/explore/v2.1/catalog/datasets/bornes-irve/records"
 DEPARTMENTS = ["77", "91", "94"]
@@ -76,13 +78,30 @@ def pick_power(group: list[dict]) -> float | None:
     return max(powers) if powers else None
 
 
-def pick_price(group: list[dict]) -> str | None:
+def estimate_price(power_kw: float | None) -> str:
+    """Rough French public-charging market bands by power tier, used only when the
+    source has no real tarification data for a station. Always labeled "estimation"
+    so it's never mistaken for a scraped/confirmed price — real prices vary by
+    operator, subscription, and time of day in ways this can't capture.
+    """
+    if power_kw is None or power_kw < 22:
+        band = "0,30–0,40€/kWh"
+    elif power_kw < 50:
+        band = "0,35–0,45€/kWh"
+    elif power_kw < 150:
+        band = "0,40–0,55€/kWh"
+    else:
+        band = "0,50–0,65€/kWh"
+    return f"~{band} (estimation)"
+
+
+def pick_price(group: list[dict], power_kw: float | None) -> str:
     if any(str(row.get("gratuit")).lower() == "true" for row in group):
         return "Gratuit"
     for row in group:
         if row.get("tarification"):
             return row["tarification"][:80]
-    return None
+    return estimate_price(power_kw)
 
 
 def valid_coords(lat, lon) -> bool:
@@ -115,6 +134,7 @@ def build_station_specs(rows: list[dict]) -> list[dict]:
         address = first.get("adresse_station") or ""
         operator = first.get("nom_operateur") or first.get("nom_amenageur")
 
+        power = pick_power(group)
         specs.append(
             dict(
                 external_ref=key,
@@ -124,8 +144,8 @@ def build_station_specs(rows: list[dict]) -> list[dict]:
                 longitude=lon,
                 operator=operator,
                 connector_type=pick_connector_type(group),
-                advertised_power_kw=pick_power(group),
-                estimated_price=pick_price(group),
+                advertised_power_kw=power,
+                estimated_price=pick_price(group, power),
             )
         )
     return specs
@@ -173,6 +193,12 @@ def run():
                         connector_type=spec["connector_type"],
                         advertised_power_kw=spec["advertised_power_kw"],
                         estimated_price=spec["estimated_price"],
+                        # A station in the official national registry is presumed
+                        # operational until a real community report says otherwise —
+                        # matches how the app is meant to work (Waze-style: assume ok,
+                        # let reports downgrade it), rather than sitting on "unknown"
+                        # forever for stations nobody has reported on yet.
+                        current_status=StationStatus.ok,
                     )
                 )
                 created += 1
