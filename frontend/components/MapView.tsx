@@ -31,6 +31,21 @@ function statusIcon(station: Station) {
   });
 }
 
+const searchPinIcon = L.divIcon({
+  className: "",
+  html: `
+    <div style="filter: drop-shadow(0 2px 4px rgba(15,23,42,0.35))">
+      <svg width="30" height="38" viewBox="0 0 24 30" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 0C6.75 0 2.5 4.24 2.5 9.46 2.5 15.6 12 28 12 28s9.5-12.4 9.5-18.54C21.5 4.24 17.25 0 12 0z"
+          fill="#0f172a" stroke="white" stroke-width="1.5"/>
+        <circle cx="12" cy="9.5" r="3" fill="white"/>
+      </svg>
+    </div>`,
+  iconSize: [30, 38],
+  iconAnchor: [15, 36],
+  popupAnchor: [0, -34],
+});
+
 const youAreHereIcon = L.divIcon({
   className: "",
   html: `
@@ -79,9 +94,10 @@ interface MapViewProps {
   stations: Station[];
   center: [number, number];
   userPosition?: [number, number] | null;
+  searchMarker?: [number, number] | null;
 }
 
-export default function MapView({ stations, center, userPosition }: MapViewProps) {
+export default function MapView({ stations, center, userPosition, searchMarker }: MapViewProps) {
   return (
     <MapContainer center={center} zoom={13} className="h-full w-full" scrollWheelZoom zoomControl={false}>
       <TileLayer
@@ -96,6 +112,11 @@ export default function MapView({ stations, center, userPosition }: MapViewProps
       {userPosition && (
         <Marker position={userPosition} icon={youAreHereIcon} zIndexOffset={-100}>
           <Popup>Vous êtes ici (approximatif)</Popup>
+        </Marker>
+      )}
+      {searchMarker && (
+        <Marker position={searchMarker} icon={searchPinIcon}>
+          <Popup>Adresse recherchée</Popup>
         </Marker>
       )}
       {stations.map((station) => (
