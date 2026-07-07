@@ -230,3 +230,5 @@ voltmate/
     ├── components/
     └── lib/
 ```
+
+<!-- CI check registration -->
