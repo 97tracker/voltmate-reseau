@@ -19,7 +19,12 @@ charger.
 
 Différenciateur concret : le score de fiabilité recalculé à chaque signalement (voir
 `backend/app/reliability.py`) et le sticker QR physique collé sur la borne — un point de contact
-that les apps purement numériques n'ont pas.
+that les apps purement numériques n'ont pas. Le cadrage produit/marketing retenu est **« Borne
+Reporter », le Waze des bornes de recharge** : on ne vend pas un produit QR (le QR est un canal
+d'acquisition contrôlé par VoltMate, pas une fonctionnalité utilisateur, voir Phase 1), on vend le
+geste de signalement communautaire. La copie de la landing page a été réécrite en ce sens (PR #13,
+commit `883a06c`) — toute future page/feature doit rester cohérente avec ce cadrage plutôt que de
+remettre le QR au centre du message.
 
 **Non-objectifs assumés** : pas de paiement de recharge intégré, pas de guidage GPS turn-by-turn
 (on renvoie vers Maps/Waze), pas de matériel (pas de bornes VoltMate). Rester un calque de
@@ -45,6 +50,21 @@ ville par ville, plutôt que de diluer l'effort sur toute la France dès le jour
 |-------|-------------------|------------------|
 | 1 | Aucune — 100% gratuit | Tant que la densité de données n'est pas là, monétiser tuerait l'adoption |
 | 2 | Premium B2C (~2-4€/mois ou ~20-25€/an) : historique illimité, alertes intelligentes (« ta borne favorite est de nouveau fiable »), planification de trajet avancée | Une fois qu'il y a une base d'utilisateurs actifs récurrents à convertir (prix volontairement bas, décision d'achat impulsive, aligné sur Chargemap Pass/ABRP Premium) |
+
+**Ruling CEO (07/07) — champ véhicule vs Premium** : le fondateur a demandé, dans la même série de
+demandes que le reste de ce cycle, que « les utilisateurs premium puissent ajouter la marque de leur
+véhicule ». La session a livré le champ `vehicle` (profil utilisateur, PR #12) **gratuit pour tous**,
+pas gated. Décision maintenue explicitement : il n'existe aujourd'hui **aucune infrastructure de
+paiement/tiers Premium** dans le produit (0 lignes de code liées à `is_premium`/facturation) ; en
+construire une pour gater un unique champ texte bas-valeur serait un coût d'opportunité pur contre la
+séquence de la Phase 1 (§ 3 : « tant que la densité de données n'est pas là, monétiser tuerait
+l'adoption ») et contre les KPI de sortie de Phase 1, qui ne sont pas atteints. Le champ véhicule
+reste gratuit. Ce qui *peut* légitimement devenir un levier Premium en Phase 2, une fois les KPI de
+rétention validés : pas le champ lui-même, mais des fonctionnalités construites dessus (garage
+multi-véhicules, filtrage automatique des bornes par compatibilité de connecteur/puissance, alertes
+liées au véhicule). `product-owner` : ne pas rouvrir ce sujet avant que les KPI de sortie de Phase 1
+soient réellement atteints — c'est une redite de la même règle de séquencement que Premium au sens
+large, pas une exception.
 | 3 | Certification opérateur « VoltMate Vérifié » : badge/label payant pour les bornes qui maintiennent un score > 90 sur 90 jours, utilisable par l'opérateur en marketing | Une fois le score de fiabilité crédible statistiquement (assez de volume de signalements par borne) |
 | 3 | Data B2B anonymisée/agrégée pour flottes d'entreprise (« quelles bornes sont fiables sur cet axe ») | Idem — nécessite du volume de données pour être vendable |
 | 4 | API entreprise (accès programmatique aux données de fiabilité) pour apps tierces / constructeurs | Une fois qu'un vrai jeu de données propriétaire existe (pas juste un miroir d'OpenChargeMap) |
@@ -65,23 +85,68 @@ un bassin restreint, avant de dépenser un euro en acquisition nationale.
   Ouverte 2.0), pas OpenChargeMap** (voir §6 Risques pour le changement de source). 1 956 bornes
   réelles importées (adresse, opérateur, type de connecteur, puissance), remplaçant les 12 bornes de
   démo. Script `backend/import_irve.py`, idempotent (upsert par `external_ref`, donc ré-exécutable
-  pour rafraîchir ou étendre à d'autres départements). Mergé via PR #8 (commit `5705b87`).
-  **Important — ceci ne couvre que la densité de localisation, pas le signal de confiance** : les
-  1 956 bornes démarrent toutes avec `current_status = "unknown"` et `reliability_score = 50`
-  (neutre) ; la confiance communautaire ne se construit que par de vrais signalements, qui restent à
-  zéro. Les KPI de sortie de Phase 1 ci-dessous ne sont **pas** considérés atteints par ce seul
-  import.
-- ⬜ Campagne de stickers QR physiques sur le bassin de lancement (impression + pose manuelle par
-  l'équipe et les premiers utilisateurs)
+  pour rafraîchir ou étendre à d'autres départements). Mergé via PR #8 (commit `5705b87`) ; les
+  valeurs par défaut ont ensuite été revues en PR #11 (commit `6ae27dd`) — les bornes importées
+  démarrent désormais à `current_status = "ok"` (présumées opérationnelles, façon Waze : on part du
+  principe qu'une borne listée par l'État fonctionne jusqu'à preuve du contraire, plutôt que de
+  laisser un statut « inconnu » indéfiniment) avec un tarif *estimé* quand la source n'a pas de
+  donnée réelle.
+  **Important — ceci ne couvre que la densité de localisation, pas le signal de confiance, et ne doit
+  pas être confondu avec lui.** Le KPI « ≥ 60% des bornes avec un statut ≠ inconnu » (§ KPI de sortie
+  de phase) est désormais quasi mécaniquement satisfait par ce défaut d'import, **avant même un seul
+  signalement réel** — ce n'est donc plus un signal fiable de progression de la Phase 1 tel quel.
+  `product-owner` doit piloter la sortie de phase sur les KPI qui restent gagnés à la main : volume de
+  signalements actifs/semaine et rétention J30 des signaleurs, pas sur le % de statuts non-« inconnu »
+  qui est maintenant un artefact du script d'import.
+- 🟡 Campagne de stickers QR physiques sur le bassin de lancement — **posés uniquement par
+  VoltMate/l'équipe**, pas par les utilisateurs : la génération de QR a été rendue admin-only (PR #11,
+  commit `6ae27dd`) sur demande explicite du fondateur (« c'est uniquement à moi d'avoir des QR
+  codes »). Le QR reste le point de contact physique différenciant décrit en § 1, mais c'est un canal
+  d'acquisition contrôlé par VoltMate, pas une fonctionnalité self-service côté utilisateur — ne pas
+  la réintroduire côté utilisateur sans une décision business explicite. Passé de ⬜ à 🟡 : le
+  mécanisme admin-only existe et fonctionne (génération unitaire), mais reste bloqué pour une vraie
+  campagne par un écart outillage identifié par `cto` — export en masse par département/zone avec
+  feuille imprimable, pas encore livré. Suivi : issue #18.
+- 🟡 Rebonte de la boucle de signalement pour la rendre viable en usage réel : le flux « signaler un
+  problème » est passé d'un menu déroulant texte à une grille d'icônes/tags à sélection tactile
+  (Fuel = thermique garée sur la place, Ban = hors service, PhoneOff = bug appli/paiement, etc.), avec
+  en plus une bannière façon Waze « ce problème existe-t-il encore ? » en confirmation à un tap.
+  Testé de bout en bout par le nouvel agent `test-user` (perspective conducteur réel, distincte de
+  `qa-tester`) : fonctionne comme prévu. Seule remarque, non bloquante : les tags `ice_parked` (icône
+  Fuel) et `payment_failed` (icône PhoneOff) sont les deux où un conducteur de première visite peut
+  avoir besoin du libellé texte pour bien comprendre l'icône seule — pas un bug, pas d'action requise
+  dans l'immédiat ; à surveiller si le volume réel de signalements sur ces deux tags s'avère
+  anormalement bas une fois la Phase 1 en cours (signal indirect que l'icône n'est pas comprise).
 - ⬜ Seeding communautaire : forums EV français (Automobile-Propre, groupes Facebook véhicule
-  électrique régionaux), pas de pub payante à ce stade
-- ⬜ PWA installable (ajout à l'écran d'accueil) pour réduire la friction de retour
+  électrique régionaux), pas de pub payante à ce stade. C'est la priorité la plus urgente de la phase
+  actuelle (priorité #1 confirmée par `ceo`) : la couverture cartographique et l'onboarding sont
+  maintenant traités (voir ci-dessous), le vrai goulot d'étranglement restant est de faire venir les
+  100-200 premiers conducteurs réels du bassin pour produire les premiers signalements — sans eux,
+  les KPI qui comptent réellement (signalements/semaine, rétention J30 des signaleurs) restent à zéro
+  indéfiniment.
+  (Note : un onboarding « Borne Reporter » — bouton assistant + tutoriel de recharge/calculateur de
+  coût sur chaque fiche borne, clarifiant que VoltMate trouve/note les bornes mais ne démarre pas la
+  recharge — a été livré en PR #12 (`bc69e19`) et réduit un risque de confusion qui aurait pu casser
+  la confiance dès la première visite.)
+- ⬜ PWA installable (ajout à l'écran d'accueil) pour réduire la friction de retour. Priorité #2
+  confirmée par `ceo`, juste après le seeding communautaire ci-dessus ; `cto` confirme que c'est un
+  changement de taille réduite (aucun manifest/service worker existant, `next.config.js` déjà
+  compatible `output: "standalone"`) — mise en backlog dès maintenant plutôt que reportée. Suivi :
+  issue #19.
 - ⬜ Notifications de base (borne favorite redevenue fiable)
 
 **KPI de sortie de phase** (ne pas passer en Phase 2 sans ça) :
-- ≥ 60% des bornes du bassin de lancement avec un statut ≠ « inconnu »
-- ≥ 30 signalements actifs/semaine sur le bassin
-- Taux de rétention J30 des « signaleurs » (pas juste des visiteurs) ≥ 20%
+- ~~≥ 60% des bornes du bassin de lancement avec un statut ≠ « inconnu »~~ — **disqualifié comme
+  signal de sortie de phase (ruling `ceo` du 07/07)** : l'import IRVE (PR #11) fait démarrer les
+  bornes à `current_status = "ok"` par défaut, donc ce seuil est désormais satisfait quasi
+  mécaniquement par le script d'import, avant même un seul signalement communautaire réel. Ne plus
+  l'utiliser pour juger la sortie de Phase 1 ; conservé ci-dessus barré pour mémoire plutôt que
+  supprimé, afin de ne pas perdre la trace de pourquoi il a été écarté.
+- ≥ 30 signalements actifs/semaine sur le bassin — **seul KPI de volume qui gate désormais la sortie
+  de phase**, actuellement à zéro
+- Taux de rétention J30 des « signaleurs » (pas juste des visiteurs) ≥ 20% — **seul KPI de rétention
+  qui gate désormais la sortie de phase**, actuellement à zéro (pas encore de cohorte de signaleurs à
+  mesurer)
 
 ### Phase 2 — Croissance géographique + Premium (6-12 mois) ⬜
 - ⬜ Réplication ville par ville de la mécanique Phase 1 (pas de big-bang national)
