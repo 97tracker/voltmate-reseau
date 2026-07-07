@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bot, Camera, MapPin, MessageCircle, QrCode, Radar, TrendingUp, Zap } from "lucide-react";
+import { Bot, MapPin, MessageCircle, Radar, TrendingUp, Users, Zap } from "lucide-react";
 
 const REASONS = [
   {
@@ -18,9 +18,9 @@ const REASONS = [
     text: "Posez vos questions : Puis-je charger ici ? Combien de batterie pour 120 km ?",
   },
   {
-    icon: QrCode,
-    title: "Un QR code par borne",
-    text: "Scannez le sticker collé près d'une borne pour accéder directement à sa fiche et la noter.",
+    icon: Users,
+    title: "Construit par les conducteurs, pour les conducteurs",
+    text: "Chaque signalement vient d'un conducteur qui vient de charger. Plus la communauté grandit, plus la carte devient fiable.",
   },
 ];
 
@@ -70,11 +70,12 @@ export default function HomePage() {
 
       <section className="card flex items-center gap-4">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-volt-100 text-volt-700">
-          <Camera className="h-5 w-5" />
+          <Radar className="h-5 w-5" />
         </span>
         <p className="text-sm font-medium text-ink-700">
-          Scannez le QR code près d&apos;une borne et aidez les autres conducteurs à savoir si elle
-          fonctionne vraiment.
+          Trouvez une borne sur la carte et signalez son état en 10 secondes — aidez les autres
+          conducteurs à savoir si elle fonctionne vraiment. Un sticker sur la borne ? Scannez-le pour
+          y accéder directement.
         </p>
       </section>
 
