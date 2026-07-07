@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { getCurrentPosition } from "@/lib/geolocation";
 import type { AssistantAnswer } from "@/lib/types";
 
 interface Message {
@@ -64,11 +65,22 @@ export default function AssistantPage() {
         .finally(() => setLoading(false));
     };
 
-    if (question.toLowerCase().includes("proche") && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => askWithPosition(pos.coords.latitude, pos.coords.longitude),
-        () => askWithPosition()
-      );
+    if (question.toLowerCase().includes("proche")) {
+      getCurrentPosition()
+        .then(({ latitude, longitude }) => askWithPosition(latitude, longitude))
+        .catch((err) => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              text:
+                err instanceof Error
+                  ? err.message
+                  : "Impossible d'obtenir votre position, je réponds sans la prendre en compte.",
+            },
+          ]);
+          askWithPosition();
+        });
     } else {
       askWithPosition();
     }
