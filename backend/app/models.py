@@ -91,8 +91,12 @@ class Station(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    reports = relationship("Report", back_populates="station", cascade="all, delete-orphan")
-    comments = relationship("Comment", back_populates="station", cascade="all, delete-orphan")
+    reports = relationship(
+        "Report", back_populates="station", cascade="all, delete-orphan", order_by="Report.created_at.desc()"
+    )
+    comments = relationship(
+        "Comment", back_populates="station", cascade="all, delete-orphan", order_by="Comment.created_at.desc()"
+    )
     photos = relationship("StationPhoto", back_populates="station", cascade="all, delete-orphan")
 
 
