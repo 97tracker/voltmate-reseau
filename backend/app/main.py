@@ -10,7 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from app.config import get_settings
 from app.database import Base, engine
 from app.limiter import limiter
-from app.routers import admin, assistant, comments, photos, qrcode, reports, stations, users
+from app.routers import admin, assistant, comments, geo, photos, qrcode, reports, stations, users
 
 settings = get_settings()
 
@@ -56,6 +56,7 @@ app.include_router(users.router, prefix=prefix)
 app.include_router(admin.router, prefix=prefix)
 app.include_router(assistant.router, prefix=prefix)
 app.include_router(qrcode.router, prefix=prefix)
+app.include_router(geo.router, prefix=prefix)
 
 
 @app.get("/health")

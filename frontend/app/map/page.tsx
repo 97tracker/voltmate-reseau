@@ -13,9 +13,16 @@ const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
 const PARIS_CENTER: [number, number] = [48.8566, 2.3522];
 const NEARBY_RADIUS_KM = 30;
 
+interface IpLocateResponse {
+  latitude: number | null;
+  longitude: number | null;
+  city: string | null;
+}
+
 export default function MapPage() {
   const [stations, setStations] = useState<Station[]>([]);
   const [center, setCenter] = useState<[number, number]>(PARIS_CENTER);
+  const [userPosition, setUserPosition] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(true);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +69,23 @@ export default function MapPage() {
   }
 
   useEffect(() => {
-    loadAll();
+    // Best-effort, silent IP-based approximate location on load — no permission
+    // prompt, unlike GPS, so the map starts centered near the visitor instead of
+    // always defaulting to Paris. Precise GPS (below) remains available and takes
+    // over the "you are here" marker once the user opts in.
+    (async () => {
+      try {
+        const geo = await api.get<IpLocateResponse>("/geo/locate");
+        if (geo.latitude !== null && geo.longitude !== null) {
+          setUserPosition([geo.latitude, geo.longitude]);
+          await loadNearby(geo.latitude, geo.longitude);
+          return;
+        }
+      } catch {
+        // fall through to default view below
+      }
+      await loadAll();
+    })();
   }, []);
 
   async function useMyPosition() {
@@ -71,6 +94,7 @@ export default function MapPage() {
     setNotice(null);
     try {
       const { latitude, longitude } = await getCurrentPosition();
+      setUserPosition([latitude, longitude]);
       await loadNearby(latitude, longitude);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Impossible d'obtenir votre position.");
@@ -83,17 +107,21 @@ export default function MapPage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-ink-900">Bornes proches</h1>
-        <button onClick={useMyPosition} className="btn-secondary text-sm" disabled={locating}>
-          <LocateFixed className="h-4 w-4" />
-          {locating ? "Localisation..." : "Utiliser ma position"}
-        </button>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       {notice && <p className="text-sm text-ink-500">{notice}</p>}
 
-      <div className="h-72 overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
-        <MapView stations={stations} center={center} />
+      <div className="relative h-[60vh] min-h-[420px] overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
+        <MapView stations={stations} center={center} userPosition={userPosition} />
+        <button
+          onClick={useMyPosition}
+          disabled={locating}
+          aria-label="Utiliser ma position précise"
+          className="absolute bottom-4 right-4 z-[500] flex h-11 w-11 items-center justify-center rounded-full bg-white text-volt-600 shadow-lg ring-1 ring-black/5 transition hover:bg-volt-50 disabled:opacity-60"
+        >
+          <LocateFixed className={`h-5 w-5 ${locating ? "animate-pulse" : ""}`} />
+        </button>
       </div>
 
       <div className="flex flex-col gap-3">
