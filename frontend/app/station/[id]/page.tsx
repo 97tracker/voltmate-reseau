@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AlertTriangle, Bot, CheckCircle2 } from "lucide-react";
 import ChargingTutorial from "@/components/ChargingTutorial";
+import IssueConfirmBanner from "@/components/IssueConfirmBanner";
 import StatusBadge from "@/components/StatusBadge";
+import { REPORT_TAG_ICONS, REPORT_TAG_LABELS } from "@/lib/reportTags";
 import { api } from "@/lib/api";
-import { REPORT_STATUS_LABELS, StationDetail } from "@/lib/types";
+import { StationDetail } from "@/lib/types";
 
 export default function StationDetailPage({ params }: { params: { id: string } }) {
   const [station, setStation] = useState<StationDetail | null>(null);
@@ -107,19 +109,29 @@ export default function StationDetailPage({ params }: { params: { id: string } }
         </div>
       </div>
 
+      {station.reports.length > 0 && station.reports[0].status !== "working" && (
+        <IssueConfirmBanner stationId={station.id} latestReport={station.reports[0]} onConfirmed={load} />
+      )}
+
       <ChargingTutorial station={station} />
 
       <div className="card">
         <h2 className="mb-2 font-semibold text-ink-900">Derniers signalements</h2>
         {station.reports.length === 0 && <p className="text-sm text-ink-500">Aucun signalement pour l'instant.</p>}
         <ul className="flex flex-col gap-2">
-          {station.reports.slice(0, 10).map((r) => (
-            <li key={r.id} className="rounded-lg bg-slate-50 p-3 text-sm">
-              <span className="font-medium">{REPORT_STATUS_LABELS[r.status]}</span>
-              {r.comment && <p className="mt-1 text-ink-500">{r.comment}</p>}
-              <p className="mt-1 text-xs text-ink-500">{new Date(r.created_at).toLocaleString("fr-FR")}</p>
-            </li>
-          ))}
+          {station.reports.slice(0, 10).map((r) => {
+            const Icon = REPORT_TAG_ICONS[r.status];
+            return (
+              <li key={r.id} className="rounded-lg bg-slate-50 p-3 text-sm">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <Icon className="h-4 w-4" />
+                  {REPORT_TAG_LABELS[r.status]}
+                </span>
+                {r.comment && <p className="mt-1 text-ink-500">{r.comment}</p>}
+                <p className="mt-1 text-xs text-ink-500">{new Date(r.created_at).toLocaleString("fr-FR")}</p>
+              </li>
+            );
+          })}
         </ul>
       </div>
 
