@@ -38,11 +38,14 @@ CREATE TABLE IF NOT EXISTS stations (
     estimated_price VARCHAR(80),
     current_status station_status NOT NULL DEFAULT 'unknown',
     reliability_score INTEGER NOT NULL DEFAULT 50,
+    source VARCHAR(20) NOT NULL DEFAULT 'community',
+    external_ref VARCHAR(120) UNIQUE,
     created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_stations_created_by ON stations(created_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_stations_external_ref ON stations(external_ref);
 
 CREATE TABLE IF NOT EXISTS reports (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
