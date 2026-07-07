@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, LocateFixed, Search, X } from "lucide-react";
 import StationCard from "@/components/StationCard";
 import { api } from "@/lib/api";
-import { departmentCodeFromAddress, FRENCH_DEPARTMENTS } from "@/lib/departments";
+import { departmentCodeFromAddress, FRENCH_DEPARTMENTS, postalCodeFromAddress } from "@/lib/departments";
 import { getCurrentPosition } from "@/lib/geolocation";
 import { STATION_STATUS_LABELS, Station, StationStatus } from "@/lib/types";
 
@@ -45,6 +45,7 @@ export default function MapPage() {
 
   const [statusFilter, setStatusFilter] = useState<StationStatus | "all">("all");
   const [zoneFilter, setZoneFilter] = useState<string>("all");
+  const [postalCode, setPostalCode] = useState("");
   const [page, setPage] = useState(1);
 
   // Only offer zones that actually have a station in the currently loaded set — a
@@ -59,13 +60,19 @@ export default function MapPage() {
     return Array.from(codes).sort();
   }, [stations]);
 
+  const trimmedPostalCode = postalCode.trim();
+
   const filteredStations = useMemo(() => {
     return stations.filter((s) => {
       if (statusFilter !== "all" && s.current_status !== statusFilter) return false;
       if (zoneFilter !== "all" && departmentCodeFromAddress(s.address) !== zoneFilter) return false;
+      if (trimmedPostalCode) {
+        const postal = postalCodeFromAddress(s.address);
+        if (!postal || !postal.startsWith(trimmedPostalCode)) return false;
+      }
       return true;
     });
-  }, [stations, statusFilter, zoneFilter]);
+  }, [stations, statusFilter, zoneFilter, trimmedPostalCode]);
 
   const pageCount = Math.max(1, Math.ceil(filteredStations.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -73,7 +80,7 @@ export default function MapPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, zoneFilter, stations]);
+  }, [statusFilter, zoneFilter, trimmedPostalCode, stations]);
 
   async function loadAll() {
     setLoading(true);
@@ -272,6 +279,17 @@ export default function MapPage() {
           ))}
         </select>
       </div>
+
+      <input
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        maxLength={5}
+        placeholder="Code postal (ex : 77300)"
+        value={postalCode}
+        onChange={(e) => setPostalCode(e.target.value.replace(/[^0-9]/g, ""))}
+        className="input text-sm"
+      />
 
       <div className="flex flex-col gap-3">
         {loading && <p className="text-sm text-ink-500">Chargement des bornes...</p>}

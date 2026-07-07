@@ -117,3 +117,8 @@ export function departmentCodeFromAddress(address: string): string | null {
   const code = metro[1].slice(0, 2);
   return code in FRENCH_DEPARTMENTS ? code : null;
 }
+
+export function postalCodeFromAddress(address: string): string | null {
+  const match = address.match(/\b(\d{5})\b/);
+  return match ? match[1] : null;
+}
